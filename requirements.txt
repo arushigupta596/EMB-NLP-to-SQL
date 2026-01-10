@@ -1,0 +1,34 @@
+# Core Dependencies
+streamlit>=1.31.0
+pandas>=2.2.0
+numpy>=1.26.4
+openpyxl==3.1.2
+python-dotenv==1.0.0
+
+# Database
+sqlalchemy==2.0.25
+
+# LangChain and LLM
+langchain==0.1.6
+langchain-community==0.0.19
+langchain-experimental==0.0.51
+langchain-core==0.1.23
+langsmith==0.0.87
+openai==1.12.0
+
+# Visualization
+plotly==5.18.0
+kaleido==0.2.1
+matplotlib>=3.8.2
+seaborn==0.13.2
+
+# Report Generation
+reportlab==4.0.9
+Pillow>=10.3.0
+
+# HTTP Requests
+requests==2.31.0
+httpx==0.26.0
+
+# Data Processing
+scikit-learn==1.4.0
