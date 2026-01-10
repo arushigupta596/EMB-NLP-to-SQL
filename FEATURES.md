@@ -76,7 +76,7 @@ Automatically generate appropriate charts based on your data and question.
 
 ---
 
-### 5. PDF Report Generation
+### 5. Report Generation
 
 Create comprehensive PDF reports with charts and insights.
 
@@ -91,13 +91,6 @@ Create comprehensive PDF reports with charts and insights.
 - "Generate a sales report"
 - "Create a customer analysis report with charts"
 - "Generate a detailed product performance report"
-
-**Output:**
-- Professional PDF format
-- Downloadable from UI
-- Saved in `data/processed/`
-- Timestamped filenames
-
 ---
 
 ### 6. Sample Questions Library
@@ -143,25 +136,7 @@ Pre-built question templates organized by category.
 
 ---
 
-### 7. LangSmith Integration
-
-Optional monitoring and debugging of LLM interactions.
-
-**Benefits:**
-- 📊 Track query performance
-- 🐛 Debug SQL generation issues
-- 💰 Monitor API costs
-- 📈 Analyze usage patterns
-- ✅ Quality assurance
-
-**Setup:**
-- Optional (works without it)
-- Configure in `.env` file
-- Free tier available
-
----
-
-### 8. Multi-Table Support
+### 7. Multi-Table Support
 
 Work with multiple related tables simultaneously.
 
@@ -176,7 +151,7 @@ Work with multiple related tables simultaneously.
 
 ---
 
-### 9. Database Schema Explorer
+### 8. Database Schema Explorer
 
 View and understand your database structure.
 
@@ -195,7 +170,7 @@ View and understand your database structure.
 
 ---
 
-### 10. Export Capabilities
+### 9. Export Capabilities
 
 Download and share your analysis results.
 
@@ -204,7 +179,6 @@ Download and share your analysis results.
 | Format | Content | Use Case |
 |--------|---------|----------|
 | CSV | Query results | Data analysis in Excel/Python |
-| PDF | Full report | Sharing with stakeholders |
 | PNG | Individual charts | Presentations |
 
 **Features:**
@@ -314,3 +288,4 @@ Graceful error management:
 
 For detailed usage instructions, see README.md
 For quick start, see QUICKSTART.md
+
