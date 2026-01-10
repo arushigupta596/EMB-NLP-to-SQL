@@ -8,7 +8,6 @@ A powerful Streamlit-based application that allows users to chat with their data
 - **Data Normalization**: Automatically cleans and normalizes CSV/Excel files
 - **Interactive Chat Interface**: User-friendly chat interface powered by Streamlit
 - **Visualizations**: Generate charts and graphs (bar, line, pie, scatter, histogram, etc.)
-- **Report Generation**: Create comprehensive PDF reports with charts and insights
 - **Professional Reports**: Generate advanced reports with AI-powered executive summaries and KPIs
 - **Sample Questions**: Pre-built question templates to get started quickly
 - **LangSmith Integration**: Track and monitor LLM interactions
@@ -24,8 +23,6 @@ NLP to SQL/
 ├── database_handler.py         # SQLite database operations
 ├── llm_handler.py              # LangChain SQL agent and LLM integration
 ├── chart_generator.py          # Chart and visualization generation
-├── report_generator.py         # Basic PDF report generation
-├── advanced_report_generator.py # Professional PDF reports with AI summaries
 ├── sample_questions.py         # Sample question templates
 ├── requirements.txt            # Python dependencies
 ├── .env                        # Environment variables (not in git)
@@ -372,3 +369,4 @@ For issues or questions:
 ---
 
 Built with ❤️ using Streamlit, LangChain, and OpenRouter
+
