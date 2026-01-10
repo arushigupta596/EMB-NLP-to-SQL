@@ -28,7 +28,6 @@ SAMPLE_QUESTIONS = {
         "Show me a bar chart of products by price",
         "Create a pie chart of customers by country",
         "Generate a line chart of orders over time",
-        "Show me a scatter plot of quantity vs price",
         "Create a bar graph of top 10 customers by total purchases"
     ],
 
