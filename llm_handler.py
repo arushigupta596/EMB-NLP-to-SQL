@@ -35,6 +35,19 @@ def clean_sql_query(query: str) -> str:
     # Remove "SQL Query:" variations
     query = re.sub(r'^SQL\s*Query:\s*', '', query, flags=re.IGNORECASE)
 
+    # CRITICAL: Remove SQLQuery: label if it appears anywhere in the middle or end
+    # This handles cases where LLM duplicates the query with SQLQuery: in the middle
+    # Match from SQLQuery: to the end and remove everything from that point
+    if 'SQLQuery:' in query or 'sqlquery:' in query.lower():
+        # Find the position of SQLQuery: (case insensitive)
+        sqlquery_match = re.search(r'SQLQuery:', query, re.IGNORECASE)
+        if sqlquery_match:
+            # Check if this is a duplicate by seeing if there's a complete SQL before it
+            before_label = query[:sqlquery_match.start()].strip()
+            # If there's already a SELECT statement before SQLQuery:, truncate at SQLQuery:
+            if 'SELECT' in before_label.upper():
+                query = before_label
+
     # First, remove conversational phrases at the start
     # Match patterns like "I'll help you...", "Here is...", "Let me...", etc.
     # Do this BEFORE attempting to find SQL keywords
@@ -300,22 +313,33 @@ CRITICAL SQLite-Specific Rules (This is SQLite, NOT MySQL or PostgreSQL):
 - For date formatting: Use strftime('%Y-%m-%d', date_column)
 - For month extraction: Use strftime('%m', date_column) or CAST(strftime('%m', date_column) AS INTEGER)
 - For year extraction: Use strftime('%Y', date_column)
-- ALWAYS prefix column names with table names in JOINs to avoid "ambiguous column name" errors
-  Example: orders.ordernumber, orderdetails.ordernumber (NOT just ordernumber)
+- CRITICAL: ALWAYS prefix ALL column names with table names or aliases when using JOINs
+  * This includes columns in SELECT, WHERE, GROUP BY, ORDER BY, and HAVING clauses
+  * WRONG: SELECT ordernumber, SUM(quantityordered * priceeach) FROM orders JOIN orderdetails ...
+  * CORRECT: SELECT orders.ordernumber, SUM(orderdetails.quantityordered * orderdetails.priceeach) FROM orders JOIN orderdetails ON orders.ordernumber = orderdetails.ordernumber
+  * The ordernumber column exists in BOTH orders and orderdetails tables - MUST specify which one
+  * When grouping or ordering by shared columns, use the table prefix: GROUP BY orders.ordernumber
 - SQLite is case-sensitive for LIKE by default, use LOWER() for case-insensitive searches
 - SQLite uses || for string concatenation, NOT CONCAT()
 - Use CAST(x AS INTEGER) or CAST(x AS REAL) for type conversion
 
 Important Guidelines for Answer:
+- CRITICAL: ONLY provide answers based on ACTUAL DATA returned by the query
+- If the query returns NO RESULTS, say "No data found" - DO NOT provide generic explanations or advice
 - Write in plain business language - DO NOT mention SQL, queries, tables, joins, databases, or internal processing
 - DO NOT explain column names, technical details, or how data was retrieved
-- Keep responses SHORT and CLEAR (1-2 sentences maximum)
-- Always lead with the final result, not the method
+- Keep responses SHORT and CLEAR (1-2 sentences maximum) - NEVER write more than 200 characters
+- DO NOT provide generic business advice, explanations of concepts, or recommendations
+- DO NOT write paragraphs explaining what the analysis means - just state the facts from the data
+- Always lead with the final result from the data, not the method
 - Use natural business language as if speaking to a colleague
 - For counts/totals: State the number directly (e.g., "There are 25 products" NOT "The query returned 25 products")
 - For lists: Provide a brief summary (e.g., "The top 3 products are X, Y, and Z")
 - For single values: State the value naturally (e.g., "The average price is $45.99")
-- Be conversational and direct, avoiding technical jargon
+- For trends: State the trend concisely (e.g., "Revenue increased from $10K in Jan to $15K in Jun")
+- Be conversational and direct, avoiding technical jargon and generic filler text
+- WRONG: "Tracking monthly revenue is like checking your business's pulse..." (too verbose, generic)
+- CORRECT: "No data found for the last 6 months" OR "Revenue ranged from $X to $Y across 6 months"
 
 Question: {input}"""
 

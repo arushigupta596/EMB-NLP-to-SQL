@@ -717,12 +717,16 @@ def process_user_query(question: str, components):
                 # For non-chart, non-report queries: Keep the LLM's natural language answer
                 # Only generate simple answers if LLM didn't provide one
                 if not chart_type and not is_report_request:
-                    # Keep LLM answer if it exists and is meaningful
-                    if response.get('answer') and response['answer'].strip():
-                        logger.info(f"Keeping LLM-generated answer: {response['answer'][:100]}")
-                    else:
-                        # Only generate fallback answer if LLM didn't provide one
-                        if not df.empty:
+                    # CRITICAL: If dataframe is empty, always override with clear message
+                    if df.empty:
+                        response['answer'] = "No data found for the specified criteria. The database may not contain records matching your query parameters."
+                        logger.info("DataFrame is empty - generated 'no data' message")
+                    # Keep LLM answer if it exists and is meaningful (and we have data)
+                    elif response.get('answer') and response['answer'].strip():
+                        # Check if the answer is overly verbose/generic (> 500 chars suggests generic filler)
+                        if len(response['answer']) > 500:
+                            logger.warning(f"LLM answer is verbose ({len(response['answer'])} chars), may be generic filler - generating data-driven answer")
+                            # Generate concise data-driven answer instead
                             if len(df) == 1 and len(df.columns) == 1:
                                 # Single value result (like COUNT, AVG, etc.)
                                 value = df.iloc[0, 0]
@@ -737,22 +741,44 @@ def process_user_query(question: str, components):
                                         response['answer'] = f"The {column_name} is {value:,.2f}"
                                 else:
                                     response['answer'] = f"The {column_name} is {value}"
-
-                                logger.info(f"Generated fallback answer from single value: {response['answer']}")
+                                logger.info(f"Generated data-driven answer from single value: {response['answer']}")
                             elif len(df) <= 10:
                                 # Small result set - provide summary
-                                response['answer'] = f"Query returned {len(df)} result(s)."
-                                logger.info(f"Generated fallback answer for small result set: {response['answer']}")
+                                response['answer'] = f"Query returned {len(df)} result(s). Please see the data table below for details."
+                                logger.info(f"Generated data-driven answer for small result set: {response['answer']}")
                             else:
                                 # Large result set - just mention count
-                                response['answer'] = f"Found {len(df)} result(s)."
-                                logger.info(f"Generated fallback answer for large result set: {response['answer']}")
+                                response['answer'] = f"Found {len(df)} result(s). Please see the data table below for details."
+                                logger.info(f"Generated data-driven answer for large result set: {response['answer']}")
                         else:
-                            # Empty result
-                            response['answer'] = "No results found for this query."
-                            logger.info("Generated fallback answer for empty result")
+                            logger.info(f"Keeping concise LLM-generated answer: {response['answer'][:100]}")
+                    else:
+                        # LLM didn't provide an answer - generate fallback
+                        if len(df) == 1 and len(df.columns) == 1:
+                            # Single value result (like COUNT, AVG, etc.)
+                            value = df.iloc[0, 0]
+                            column_name = df.columns[0].replace('_', ' ').title()
 
-                # Generate chart if requested
+                            # Format the value based on column name
+                            if isinstance(value, (int, float)):
+                                # Check if it's likely a currency value
+                                if any(keyword in column_name.lower() for keyword in ['price', 'amount', 'value', 'total', 'cost', 'revenue', 'sales']):
+                                    response['answer'] = f"The {column_name} is ${value:,.2f}"
+                                else:
+                                    response['answer'] = f"The {column_name} is {value:,.2f}"
+                            else:
+                                response['answer'] = f"The {column_name} is {value}"
+                            logger.info(f"Generated fallback answer from single value: {response['answer']}")
+                        elif len(df) <= 10:
+                            # Small result set - provide summary
+                            response['answer'] = f"Query returned {len(df)} result(s)."
+                            logger.info(f"Generated fallback answer for small result set: {response['answer']}")
+                        else:
+                            # Large result set - just mention count
+                            response['answer'] = f"Found {len(df)} result(s)."
+                            logger.info(f"Generated fallback answer for large result set: {response['answer']}")
+
+                # Generate chart ONLY if explicitly requested
                 if chart_type and not df.empty:
                     chart = components['chart_gen'].generate_chart(
                         df,
@@ -762,11 +788,10 @@ def process_user_query(question: str, components):
                     response['chart'] = chart
                     st.session_state.current_chart = chart
 
-                # Auto-generate chart for small result sets
-                elif len(df) <= 20 and len(df.columns) >= 2 and not chart_type:
-                    chart = components['chart_gen'].auto_generate_chart(df, question)
-                    response['chart'] = chart
-                    st.session_state.current_chart = chart
+                # DO NOT auto-generate charts for regular queries
+                # Charts are only generated when:
+                # 1. User explicitly requests a chart (chart_type is set)
+                # 2. User requests a report (handled separately below)
 
                 # Generate report if requested - ALWAYS use professional format
                 if is_report_request:
