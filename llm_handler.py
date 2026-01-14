@@ -54,6 +54,9 @@ def clean_sql_query(query: str) -> str:
     conversational_patterns = [
         r"^I'll\s+help\s+you.*?:\s*",
         r"^I\s+can\s+help.*?:\s*",
+        r"^I\s+apologize.*?:\s*",
+        r"^I\s+do\s+not\s+have.*",
+        r"^Sorry.*?:\s*",
         r"^Here\s+is\s+.*?:\s*",
         r"^Here's\s+.*?:\s*",
         r"^Let\s+me\s+.*?:\s*",
@@ -291,6 +294,14 @@ Answer: Final answer here
 
 Only use the following tables:
 {table_info}
+
+CRITICAL Table Relationships (for JOIN operations):
+- employees.employeenumber → customers.salesrepemployeenumber (employees are linked to customers as sales reps)
+- customers.customernumber → orders.customernumber (customers place orders)
+- orders.ordernumber → orderdetails.ordernumber (orders contain order line items)
+- products.productcode → orderdetails.productcode (products are in order details)
+- For employee revenue: JOIN employees → customers → orders → orderdetails
+  Example: FROM employees e JOIN customers c ON e.employeenumber = c.salesrepemployeenumber JOIN orders o ON c.customernumber = o.customernumber JOIN orderdetails od ON o.ordernumber = od.ordernumber
 
 Important Guidelines for SQL:
 - Return ONLY the SQL query itself - DO NOT add ANY text after the SQL query ends
