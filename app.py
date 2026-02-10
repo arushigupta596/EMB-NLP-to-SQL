@@ -1,4 +1,4 @@
-"""Main Streamlit application for NLP-to-SQL chat interface."""
+"""Main Streamlit application for NL-to-SQL chat interface."""
 import streamlit as st
 import pandas as pd
 from pathlib import Path
@@ -14,6 +14,7 @@ from chart_generator import ChartGenerator
 from report_generator import ReportGenerator
 from advanced_report_generator import AdvancedReportGenerator
 from sample_questions import get_all_sample_questions, get_categories
+from cache_manager import CacheManager
 
 # Configure logging
 logging.basicConfig(
@@ -562,6 +563,21 @@ def initialize_system():
         report_gen = ReportGenerator(PROCESSED_DIR)
         advanced_report_gen = AdvancedReportGenerator(PROCESSED_DIR, llm_handler=sql_agent)
 
+        # Initialize cache manager
+        cache_manager = None
+        if CACHE_ENABLED:
+            try:
+                cache_manager = CacheManager(
+                    cache_db_path=str(CACHE_DB_PATH),
+                    default_ttl_seconds=CACHE_DEFAULT_TTL,
+                    max_cache_size_mb=CACHE_MAX_SIZE_MB,
+                    max_result_size_bytes=CACHE_MAX_RESULT_SIZE_MB * 1024 * 1024
+                )
+                logger.info("Cache manager initialized successfully")
+            except Exception as e:
+                logger.error(f"Failed to initialize cache manager: {e}")
+                logger.info("Continuing without caching...")
+
         logger.info("System initialized successfully")
 
         return {
@@ -570,7 +586,8 @@ def initialize_system():
             'sql_agent': sql_agent,
             'chart_gen': chart_gen,
             'report_gen': report_gen,
-            'advanced_report_gen': advanced_report_gen
+            'advanced_report_gen': advanced_report_gen,
+            'cache_manager': cache_manager
         }
 
     except ValueError as e:
@@ -677,6 +694,28 @@ def display_sidebar(components):
 def process_user_query(question: str, components):
     """Process user query and return response."""
     try:
+        # Get current model from session state
+        current_model = st.session_state.get('selected_model', OPENROUTER_MODEL)
+
+        # CHECK CACHE FIRST (if cache manager is available)
+        cache_manager = components.get('cache_manager')
+        if cache_manager and CACHE_ENABLED:
+            try:
+                cached_result = cache_manager.get(question, current_model)
+                if cached_result:
+                    logger.info("Cache HIT - returning cached result")
+                    return cached_result
+            except Exception as e:
+                logger.error(f"Cache retrieval failed: {e}")
+                # Continue with normal query execution
+
+        # CACHE MISS - proceed with normal flow
+        if cache_manager:
+            logger.info("Cache MISS - querying LLM")
+
+        # Track execution time for caching
+        start_time = datetime.now()
+
         # Check if it's a report request
         is_report_request = ChartRequestParser.detect_report_request(question)
 
@@ -828,6 +867,22 @@ def process_user_query(question: str, components):
             except Exception as e:
                 logger.error(f"Error processing query results: {str(e)}", exc_info=True)
 
+        # STORE IN CACHE before returning (if cache manager available and query was successful)
+        if cache_manager and CACHE_ENABLED and result.get('sql_query'):
+            try:
+                execution_time = (datetime.now() - start_time).total_microseconds / 1000
+                cache_manager.set(
+                    question=question,
+                    model_name=current_model,
+                    sql_query=result.get('sql_query'),
+                    answer=response['answer'],
+                    result_data=response.get('data'),
+                    execution_time_ms=execution_time
+                )
+            except Exception as e:
+                logger.error(f"Failed to cache result: {e}")
+                # Continue anyway - caching failure shouldn't break the app
+
         return response
 
     except Exception as e:
@@ -848,6 +903,10 @@ def display_chat_message(message):
     content = message['content']
 
     with st.chat_message(role):
+        # Display cache indicator if result was cached
+        if content.get('cached'):
+            st.info("⚡ Result from cache", icon="⚡")
+
         # Display professional report if available
         if content.get('report_content'):
             display_report_in_chat(content['report_content'])
@@ -959,7 +1018,7 @@ def main():
     components = initialize_system()
 
     # Header
-    st.markdown('<div class="app-subtitle">NLP to SQL Intelligence Platform</div>', unsafe_allow_html=True)
+    st.markdown('<div class="app-subtitle">NL to SQL Intelligence Platform</div>', unsafe_allow_html=True)
 
     # Display sidebar
     display_sidebar(components)

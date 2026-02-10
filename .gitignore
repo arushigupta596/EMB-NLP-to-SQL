@@ -1,5 +1,7 @@
-# Environment variables
+# Environment variables and secrets
 .env
+.streamlit/secrets.toml
+secrets.toml
 
 # Python
 __pycache__/

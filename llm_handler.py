@@ -2,12 +2,11 @@
 import os
 import re
 from typing import Dict, Any, Optional
-from langchain_community.chat_models import ChatOpenAI
+from langchain_openai import ChatOpenAI
 from langchain_community.utilities import SQLDatabase
 from langchain_experimental.sql import SQLDatabaseChain
-from langchain.chains import create_sql_query_chain
-from langchain.prompts import PromptTemplate
-from langchain.schema import BaseOutputParser
+from langchain_core.prompts import PromptTemplate
+from langchain_core.output_parsers import BaseOutputParser
 import logging
 
 logger = logging.getLogger(__name__)
@@ -200,7 +199,17 @@ def clean_sql_query(query: str) -> str:
                 if has_lowercase_text:
                     query = limit_match.group(1)
 
-    return query.strip()
+    # FINAL VALIDATION: Check if the result is actually SQL
+    # If it doesn't start with a SQL keyword, it's probably an error message
+    cleaned = query.strip()
+    if cleaned and not cleaned.upper().startswith(('SELECT', 'INSERT', 'UPDATE', 'DELETE', 'WITH', 'CREATE', 'DROP', 'ALTER')):
+        # Check if it contains apology/error phrases
+        error_phrases = ['apologize', 'do not have', 'cannot', 'unable', 'sorry', 'error', 'invalid']
+        if any(phrase in cleaned.lower() for phrase in error_phrases):
+            # Return empty string to trigger fallback handling
+            return ''
+
+    return cleaned
 
 
 class OpenRouterLLM(ChatOpenAI):

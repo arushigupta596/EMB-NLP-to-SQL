@@ -1,4 +1,4 @@
-"""Configuration module for NLP-to-SQL application."""
+"""Configuration module for NL-to-SQL application."""
 import os
 from pathlib import Path
 from dotenv import load_dotenv
@@ -20,6 +20,13 @@ DB_DIR.mkdir(parents=True, exist_ok=True)
 # Database configuration
 DB_PATH = DB_DIR / "normalized_data.db"
 DB_URL = f"sqlite:///{DB_PATH}"
+
+# Cache configuration
+CACHE_DB_PATH = DB_DIR / "query_cache.db"
+CACHE_DEFAULT_TTL = int(os.getenv("CACHE_TTL_SECONDS", "86400"))  # 24 hours
+CACHE_MAX_SIZE_MB = int(os.getenv("CACHE_MAX_SIZE_MB", "500"))
+CACHE_MAX_RESULT_SIZE_MB = int(os.getenv("CACHE_MAX_RESULT_SIZE_MB", "10"))
+CACHE_ENABLED = os.getenv("CACHE_ENABLED", "true").lower() == "true"
 
 # OpenRouter configuration
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
@@ -46,7 +53,7 @@ LANGCHAIN_API_KEY = os.getenv("LANGCHAIN_API_KEY")
 LANGCHAIN_PROJECT = os.getenv("LANGCHAIN_PROJECT", "nlp-to-sql-app")
 
 # Streamlit configuration
-PAGE_TITLE = "EMB Global - NLP to SQL Intelligence"
+PAGE_TITLE = "EMB Global - NL to SQL Intelligence"
 PAGE_ICON = "🌿"  # Leaf icon matching EMB Global's green logo
 LAYOUT = "wide"
 
