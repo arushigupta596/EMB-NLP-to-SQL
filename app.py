@@ -720,9 +720,12 @@ def process_user_query(question: str, components):
                         except Exception as del_error:
                             logger.error(f"Failed to delete cached error: {del_error}")
                         # Don't return error - let it re-execute
-                    else:
-                        logger.info("Cache HIT - returning valid cached result")
+                    # If answer is empty, don't return cache - let chart/report generation run
+                    elif answer and answer.strip():
+                        logger.info("Cache HIT - returning valid cached result with answer")
                         return cached_result
+                    else:
+                        logger.info("Cache HIT but answer is empty - continuing to generate chart/report")
             except Exception as e:
                 logger.error(f"Cache retrieval failed: {e}")
                 # Continue with normal query execution
