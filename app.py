@@ -747,6 +747,7 @@ def process_user_query(question: str, components):
         chart_type = ChartRequestParser.detect_chart_request(question)
 
         # Try template first (no API call!) - same as cache warming
+        template_data = None  # Store DataFrame from template execution
         if has_template(question):
             logger.info("Using SQL template (no API call)")
             sql_query = get_template_sql(question)
@@ -754,24 +755,31 @@ def process_user_query(question: str, components):
             # Execute template SQL directly
             try:
                 result_data = components['db_handler'].execute_query(sql_query)
+                template_data = result_data  # Store for reuse
 
-                # Generate answer from data
-                if result_data.empty:
-                    answer = "No data found for the specified criteria."
-                elif len(result_data) == 1 and len(result_data.columns) == 1:
-                    value = result_data.iloc[0, 0]
-                    col_name = result_data.columns[0].replace('_', ' ').title()
-                    if isinstance(value, (int, float)):
-                        if any(keyword in col_name.lower() for keyword in ['price', 'amount', 'value', 'total', 'cost', 'revenue', 'sales', 'payment']):
-                            answer = f"The {col_name} is ${value:,.2f}"
-                        else:
-                            answer = f"The {col_name} is {value:,}"
-                    else:
-                        answer = f"The {col_name} is {value}"
-                elif len(result_data) <= 10:
+                # For chart/report requests, generate minimal answer - let chart/report code handle display
+                if chart_type or is_report_request or is_professional_report:
+                    # Minimal answer for chart/report requests
                     answer = f"Query returned {len(result_data)} result(s)."
+                    logger.info(f"Chart/report request detected - will generate visualization/report below")
                 else:
-                    answer = f"Found {len(result_data)} result(s)."
+                    # Generate detailed answer for regular queries
+                    if result_data.empty:
+                        answer = "No data found for the specified criteria."
+                    elif len(result_data) == 1 and len(result_data.columns) == 1:
+                        value = result_data.iloc[0, 0]
+                        col_name = result_data.columns[0].replace('_', ' ').title()
+                        if isinstance(value, (int, float)):
+                            if any(keyword in col_name.lower() for keyword in ['price', 'amount', 'value', 'total', 'cost', 'revenue', 'sales', 'payment']):
+                                answer = f"The {col_name} is ${value:,.2f}"
+                            else:
+                                answer = f"The {col_name} is {value:,}"
+                        else:
+                            answer = f"The {col_name} is {value}"
+                    elif len(result_data) <= 10:
+                        answer = f"Query returned {len(result_data)} result(s)."
+                    else:
+                        answer = f"Found {len(result_data)} result(s)."
 
                 # Create result dict matching LLM format
                 result = {
@@ -784,6 +792,7 @@ def process_user_query(question: str, components):
                     'answer': f"Error executing query: {str(e)}",
                     'sql_query': None
                 }
+                template_data = None
         else:
             # Fallback to LLM for non-template questions
             logger.info("No template found, calling LLM API...")
@@ -807,7 +816,14 @@ def process_user_query(question: str, components):
         # If we have a SQL query, get the data
         if result.get('sql_query'):
             try:
-                df = components['db_handler'].execute_query(result['sql_query'])
+                # Reuse template data if available (avoid re-executing query)
+                if template_data is not None:
+                    df = template_data
+                    logger.info("Reusing DataFrame from template execution (no re-query)")
+                else:
+                    df = components['db_handler'].execute_query(result['sql_query'])
+                    logger.info("Executed SQL query to get DataFrame")
+
                 response['data'] = df
                 st.session_state.current_data = df
 
