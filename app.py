@@ -957,12 +957,11 @@ def display_chat_message(message):
     content = message['content']
 
     with st.chat_message(role):
-        # Display cache indicator if result was cached (but not for errors)
-        answer_text = content.get('answer', '')
-        is_error = answer_text.startswith('Error') or 'Error code:' in answer_text
-
-        if content.get('cached') and not is_error:
-            st.info("⚡ Result from cache", icon="⚡")
+        # Cache indicator removed per user request
+        # answer_text = content.get('answer', '')
+        # is_error = answer_text.startswith('Error') or 'Error code:' in answer_text
+        # if content.get('cached') and not is_error:
+        #     st.info("⚡ Result from cache", icon="⚡")
 
         # Display professional report if available
         if content.get('report_content'):
