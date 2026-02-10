@@ -900,6 +900,9 @@ def process_user_query(question: str, components):
                     )
                     response['chart'] = chart
                     st.session_state.current_chart = chart
+                    # Clear the generic answer text - the chart speaks for itself
+                    response['answer'] = ''
+                    logger.info(f"Chart generated successfully, cleared generic answer text")
 
                 # DO NOT auto-generate charts for regular queries
                 # Charts are only generated when:
