@@ -708,7 +708,17 @@ def process_user_query(question: str, components):
                     # VALIDATE: Don't return cached errors
                     answer = cached_result.get('answer', '')
                     if 'Error code:' in answer or answer.startswith('Error'):
-                        logger.warning(f"Cached result contains error, invalidating: {answer[:100]}")
+                        logger.warning(f"Cached result contains error, deleting and re-executing: {answer[:100]}")
+                        # Delete this cached error immediately
+                        try:
+                            conn = cache_manager._get_connection()
+                            cursor = conn.cursor()
+                            cache_key, _ = cache_manager._generate_cache_key(question, current_model)
+                            cursor.execute("DELETE FROM query_cache WHERE cache_key = ?", (cache_key,))
+                            conn.commit()
+                            logger.info(f"Deleted cached error for question: {question[:50]}...")
+                        except Exception as del_error:
+                            logger.error(f"Failed to delete cached error: {del_error}")
                         # Don't return error - let it re-execute
                     else:
                         logger.info("Cache HIT - returning valid cached result")
@@ -1073,31 +1083,35 @@ def main():
     initialize_session_state()
     components = initialize_system()
 
+    # Clear any cached errors on EVERY startup (before session check)
+    if CACHE_ENABLED and components.get('cache_manager'):
+        cache_manager = components.get('cache_manager')
+        if cache_manager and 'cache_cleared' not in st.session_state:
+            try:
+                logger.info("Clearing all cached errors on startup...")
+                # Clear ALL cache entries that contain error responses
+                conn = cache_manager._get_connection()
+                cursor = conn.cursor()
+                cursor.execute("""
+                    DELETE FROM query_cache
+                    WHERE answer LIKE '%Error code:%'
+                       OR answer LIKE 'Error%'
+                       OR answer LIKE '%404%'
+                       OR answer LIKE '%402%'
+                """)
+                deleted_count = cursor.rowcount
+                conn.commit()
+                if deleted_count > 0:
+                    logger.info(f"Cleared {deleted_count} cached error(s) on startup")
+                st.session_state.cache_cleared = True
+            except Exception as e:
+                logger.warning(f"Failed to clear cached errors: {e}")
+
     # Warm cache with suggested questions (only on first run)
     if CACHE_ENABLED and components.get('cache_manager'):
         if 'cache_warmed' not in st.session_state:
             with st.spinner('Preparing suggested questions...'):
                 try:
-                    # Clear any cached errors (404, 402, etc.) before warming
-                    cache_manager = components.get('cache_manager')
-                    if cache_manager:
-                        logger.info("Checking for cached errors to clear...")
-                        try:
-                            # Clear cache entries that contain error responses
-                            conn = cache_manager._get_connection()
-                            cursor = conn.cursor()
-                            cursor.execute("""
-                                DELETE FROM query_cache
-                                WHERE answer LIKE '%Error code:%'
-                                   OR answer LIKE 'Error%'
-                            """)
-                            deleted_count = cursor.rowcount
-                            conn.commit()
-                            if deleted_count > 0:
-                                logger.info(f"Cleared {deleted_count} cached error(s)")
-                        except Exception as e:
-                            logger.warning(f"Failed to clear cached errors: {e}")
-
                     # ALWAYS use free Llama model for cache warming
                     current_model = "meta-llama/llama-3.1-8b-instruct:free"
                     stats = warm_cache_on_startup(components, current_model)
