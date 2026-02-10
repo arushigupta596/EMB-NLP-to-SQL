@@ -3,6 +3,7 @@ import logging
 from datetime import datetime
 from typing import Dict, List, Any
 from sample_questions import get_all_sample_questions
+from query_templates import get_template_sql, has_template
 
 logger = logging.getLogger(__name__)
 
@@ -76,43 +77,93 @@ class CacheWarmer:
 
                 logger.info(f"[{idx}/{len(all_questions)}] Caching: {question[:50]}...")
 
-                # Execute query
-                result = self.sql_agent.query(question)
-
-                # Check if result is an error (don't cache errors)
-                answer = result.get('answer', '')
-                if 'Error code:' in answer or answer.startswith('Error'):
-                    logger.warning(f"Skipping cache for error response: {answer[:100]}")
-
-                    # Check for 402 (insufficient credits) - stop warming entirely
-                    if 'Error code: 402' in answer or 'requires more credits' in answer:
-                        logger.error("Insufficient API credits - stopping cache warming")
-                        failed_count += 1
-                        break  # Stop warming on credit issues
-
-                    failed_count += 1
-                    continue
-
-                # Get data if SQL query was generated
+                # Try template first (no API call!)
+                sql_query = None
+                answer = None
                 result_data = None
-                if result.get('sql_query'):
+                used_template = False
+
+                if has_template(question):
+                    # Use hardcoded SQL template - NO API CALL!
+                    sql_query = get_template_sql(question)
+                    logger.info(f"  Using SQL template (no API call)")
+                    used_template = True
+
+                    # Execute template SQL directly
                     try:
-                        result_data = self.db_handler.execute_query(result['sql_query'])
+                        result_data = self.db_handler.execute_query(sql_query)
+
+                        # Generate simple answer from data
+                        if len(result_data) == 1 and len(result_data.columns) == 1:
+                            value = result_data.iloc[0, 0]
+                            col_name = result_data.columns[0].replace('_', ' ').title()
+                            if isinstance(value, (int, float)):
+                                answer = f"The {col_name} is {value:,}"
+                            else:
+                                answer = f"The {col_name} is {value}"
+                        else:
+                            answer = f"Query returned {len(result_data)} row(s)."
+
                     except Exception as e:
-                        logger.warning(f"Failed to execute SQL for cache warming: {e}")
+                        logger.error(f"Template SQL failed: {e}")
+                        failed_count += 1
+                        continue
 
-                # Store in cache (only successful results)
-                self.cache_manager.set(
-                    question=question,
-                    model_name=self.model_name,
-                    sql_query=result.get('sql_query'),
-                    answer=answer,
-                    result_data=result_data,
-                    execution_time_ms=0  # Not tracking time for cache warming
-                )
+                else:
+                    # Fallback to LLM (API call) for non-template questions
+                    try:
+                        logger.info(f"  No template found, calling LLM API...")
+                        result = self.sql_agent.query(question)
 
-                cached_count += 1
-                logger.info(f"✓ Cached successfully: {question[:50]}...")
+                        # Check if result is an error
+                        answer = result.get('answer', '')
+                        if 'Error code:' in answer or answer.startswith('Error'):
+                            logger.warning(f"Skipping cache for error response: {answer[:100]}")
+                            if 'Error code: 402' in answer or 'requires more credits' in answer:
+                                logger.error("Insufficient API credits - stopping cache warming")
+                                failed_count += 1
+                                break
+                            failed_count += 1
+                            continue
+
+                        sql_query = result.get('sql_query')
+
+                        # Get data if SQL query was generated
+                        if sql_query:
+                            try:
+                                result_data = self.db_handler.execute_query(sql_query)
+                            except Exception as e:
+                                logger.warning(f"Failed to execute SQL for cache warming: {e}")
+
+                    except Exception as e:
+                        error_msg = str(e)
+                        logger.error(f"Failed to cache question '{question[:50]}...': {error_msg}")
+
+                        # Stop on API credit issues
+                        if '402' in error_msg or 'credits' in error_msg.lower():
+                            logger.error("API credit issue detected - stopping cache warming")
+                            failed_count += 1
+                            break
+
+                        failed_count += 1
+                        continue
+
+                # Store in cache (works for both template and LLM results)
+                if sql_query and answer:
+                    self.cache_manager.set(
+                        question=question,
+                        model_name=self.model_name,
+                        sql_query=sql_query,
+                        answer=answer,
+                        result_data=result_data,
+                        execution_time_ms=0
+                    )
+                    cached_count += 1
+                    source = "template" if used_template else "LLM"
+                    logger.info(f"✓ Cached successfully ({source}): {question[:50]}...")
+                else:
+                    logger.warning(f"Skipping cache - no valid SQL or answer generated")
+                    failed_count += 1
 
             except Exception as e:
                 error_msg = str(e)
