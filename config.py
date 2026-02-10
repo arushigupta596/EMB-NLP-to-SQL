@@ -43,7 +43,8 @@ CACHE_ENABLED = get_config("CACHE_ENABLED", "true").lower() == "true"
 
 # OpenRouter configuration
 OPENROUTER_API_KEY = get_config("OPENROUTER_API_KEY")
-OPENROUTER_MODEL = get_config("OPENROUTER_MODEL", "openai/gpt-4-turbo")
+# ALWAYS use free Llama model (backend override regardless of UI selection)
+OPENROUTER_MODEL = get_config("OPENROUTER_MODEL", "meta-llama/llama-3.1-8b-instruct:free")
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 
 # Available OpenRouter models

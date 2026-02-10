@@ -695,8 +695,8 @@ def display_sidebar(components):
 def process_user_query(question: str, components):
     """Process user query and return response."""
     try:
-        # Get current model from session state
-        current_model = st.session_state.get('selected_model', OPENROUTER_MODEL)
+        # ALWAYS use free Llama model in backend (regardless of UI selection)
+        current_model = "meta-llama/llama-3.1-8b-instruct:free"
 
         # CHECK CACHE FIRST (if cache manager is available)
         cache_manager = components.get('cache_manager')
@@ -1038,7 +1038,8 @@ def main():
         if 'cache_warmed' not in st.session_state:
             with st.spinner('Preparing suggested questions...'):
                 try:
-                    current_model = st.session_state.get('selected_model', OPENROUTER_MODEL)
+                    # ALWAYS use free Llama model for cache warming
+                    current_model = "meta-llama/llama-3.1-8b-instruct:free"
                     stats = warm_cache_on_startup(components, current_model)
                     if stats.get('success'):
                         logger.info(f"Cache warming successful: {stats.get('cached_count')} questions cached")
