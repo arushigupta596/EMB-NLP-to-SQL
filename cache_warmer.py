@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import Dict, List, Any
 from sample_questions import get_all_sample_questions
 from query_templates import get_template_sql, has_template
+from llm_handler import ChartRequestParser
 
 logger = logging.getLogger(__name__)
 
@@ -93,8 +94,21 @@ class CacheWarmer:
                     try:
                         result_data = self.db_handler.execute_query(sql_query)
 
+                        # Detect if this is a chart or report request
+                        is_chart_request = ChartRequestParser.detect_chart_request(question) is not None
+                        is_report_request = ChartRequestParser.detect_report_request(question)
+                        is_professional_report = any(keyword in question.lower() for keyword in [
+                            'professional report', 'detailed report', 'comprehensive report',
+                            'executive summary', 'financial report', 'analysis report'
+                        ])
+
+                        # For chart/report requests, cache with empty answer
+                        # The actual chart/report will be generated on-demand
+                        if is_chart_request or is_report_request or is_professional_report:
+                            answer = ""  # Empty answer - chart/report will be generated fresh
+                            logger.info(f"  Chart/report question detected - caching with empty answer")
                         # Generate answer from data (matching process_user_query logic)
-                        if result_data.empty:
+                        elif result_data.empty:
                             answer = "No data found for the specified criteria."
                         elif len(result_data) == 1 and len(result_data.columns) == 1:
                             # Single value result (aggregations like COUNT, SUM, AVG)
@@ -162,7 +176,8 @@ class CacheWarmer:
                         continue
 
                 # Store in cache (works for both template and LLM results)
-                if sql_query and answer:
+                # Note: answer can be empty string for chart/report requests
+                if sql_query and answer is not None:
                     self.cache_manager.set(
                         question=question,
                         model_name=self.model_name,
