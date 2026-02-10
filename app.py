@@ -704,8 +704,14 @@ def process_user_query(question: str, components):
             try:
                 cached_result = cache_manager.get(question, current_model)
                 if cached_result:
-                    logger.info("Cache HIT - returning cached result")
-                    return cached_result
+                    # VALIDATE: Don't return cached errors
+                    answer = cached_result.get('answer', '')
+                    if 'Error code:' in answer or answer.startswith('Error'):
+                        logger.warning(f"Cached result contains error, invalidating: {answer[:100]}")
+                        # Don't return error - let it re-execute
+                    else:
+                        logger.info("Cache HIT - returning valid cached result")
+                        return cached_result
             except Exception as e:
                 logger.error(f"Cache retrieval failed: {e}")
                 # Continue with normal query execution
@@ -870,19 +876,25 @@ def process_user_query(question: str, components):
 
         # STORE IN CACHE before returning (if cache manager available and query was successful)
         if cache_manager and CACHE_ENABLED and result.get('sql_query'):
-            try:
-                execution_time = (datetime.now() - start_time).total_microseconds / 1000
-                cache_manager.set(
-                    question=question,
-                    model_name=current_model,
-                    sql_query=result.get('sql_query'),
-                    answer=response['answer'],
-                    result_data=response.get('data'),
-                    execution_time_ms=execution_time
-                )
-            except Exception as e:
-                logger.error(f"Failed to cache result: {e}")
-                # Continue anyway - caching failure shouldn't break the app
+            # CRITICAL: Never cache error responses
+            answer = response['answer']
+            if 'Error code:' not in answer and not answer.startswith('Error'):
+                try:
+                    execution_time = (datetime.now() - start_time).total_microseconds / 1000
+                    cache_manager.set(
+                        question=question,
+                        model_name=current_model,
+                        sql_query=result.get('sql_query'),
+                        answer=answer,
+                        result_data=response.get('data'),
+                        execution_time_ms=execution_time
+                    )
+                    logger.info(f"Successfully cached result for: {question[:50]}...")
+                except Exception as e:
+                    logger.error(f"Failed to cache result: {e}")
+                    # Continue anyway - caching failure shouldn't break the app
+            else:
+                logger.warning(f"Skipping cache for error response: {answer[:100]}")
 
         return response
 
