@@ -79,6 +79,20 @@ class CacheWarmer:
                 # Execute query
                 result = self.sql_agent.query(question)
 
+                # Check if result is an error (don't cache errors)
+                answer = result.get('answer', '')
+                if 'Error code:' in answer or answer.startswith('Error'):
+                    logger.warning(f"Skipping cache for error response: {answer[:100]}")
+
+                    # Check for 402 (insufficient credits) - stop warming entirely
+                    if 'Error code: 402' in answer or 'requires more credits' in answer:
+                        logger.error("Insufficient API credits - stopping cache warming")
+                        failed_count += 1
+                        break  # Stop warming on credit issues
+
+                    failed_count += 1
+                    continue
+
                 # Get data if SQL query was generated
                 result_data = None
                 if result.get('sql_query'):
@@ -87,12 +101,12 @@ class CacheWarmer:
                     except Exception as e:
                         logger.warning(f"Failed to execute SQL for cache warming: {e}")
 
-                # Store in cache
+                # Store in cache (only successful results)
                 self.cache_manager.set(
                     question=question,
                     model_name=self.model_name,
                     sql_query=result.get('sql_query'),
-                    answer=result.get('answer', 'Query executed successfully.'),
+                    answer=answer,
                     result_data=result_data,
                     execution_time_ms=0  # Not tracking time for cache warming
                 )
@@ -101,7 +115,15 @@ class CacheWarmer:
                 logger.info(f"✓ Cached successfully: {question[:50]}...")
 
             except Exception as e:
-                logger.error(f"Failed to cache question '{question[:50]}...': {e}")
+                error_msg = str(e)
+                logger.error(f"Failed to cache question '{question[:50]}...': {error_msg}")
+
+                # Stop on API credit issues
+                if '402' in error_msg or 'credits' in error_msg.lower():
+                    logger.error("API credit issue detected - stopping cache warming")
+                    failed_count += 1
+                    break
+
                 failed_count += 1
 
         duration = (datetime.now() - start_time).total_seconds()
