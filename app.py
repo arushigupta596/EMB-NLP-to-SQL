@@ -1107,8 +1107,8 @@ def main():
         cache_manager = components.get('cache_manager')
         if cache_manager and 'cache_cleared' not in st.session_state:
             try:
-                logger.info("Clearing all cached errors on startup...")
-                # Clear ALL cache entries that contain error responses
+                logger.info("Clearing cached errors and generic chart/report answers on startup...")
+                # Clear ALL cache entries that contain error responses OR generic answers for chart/report questions
                 conn = cache_manager._get_connection()
                 cursor = conn.cursor()
                 cursor.execute("""
@@ -1117,11 +1117,15 @@ def main():
                        OR answer LIKE 'Error%'
                        OR answer LIKE '%404%'
                        OR answer LIKE '%402%'
+                       OR (
+                           (question LIKE '%chart%' OR question LIKE '%report%' OR question LIKE '%graph%')
+                           AND (answer LIKE 'Found % result(s)%' OR answer LIKE 'Query returned % result(s)%')
+                       )
                 """)
                 deleted_count = cursor.rowcount
                 conn.commit()
                 if deleted_count > 0:
-                    logger.info(f"Cleared {deleted_count} cached error(s) on startup")
+                    logger.info(f"Cleared {deleted_count} cached error(s) and generic chart/report answer(s) on startup")
                 st.session_state.cache_cleared = True
             except Exception as e:
                 logger.warning(f"Failed to clear cached errors: {e}")
