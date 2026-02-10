@@ -16,6 +16,7 @@ from advanced_report_generator import AdvancedReportGenerator
 from sample_questions import get_all_sample_questions, get_categories
 from cache_manager import CacheManager
 from cache_warmer import warm_cache_on_startup
+from query_templates import get_template_sql, has_template
 
 # Configure logging
 logging.basicConfig(
@@ -735,8 +736,48 @@ def process_user_query(question: str, components):
         # Check if it's a chart request
         chart_type = ChartRequestParser.detect_chart_request(question)
 
-        # Execute SQL query
-        result = components['sql_agent'].query(question)
+        # Try template first (no API call!) - same as cache warming
+        if has_template(question):
+            logger.info("Using SQL template (no API call)")
+            sql_query = get_template_sql(question)
+
+            # Execute template SQL directly
+            try:
+                result_data = components['db_handler'].execute_query(sql_query)
+
+                # Generate answer from data
+                if result_data.empty:
+                    answer = "No data found for the specified criteria."
+                elif len(result_data) == 1 and len(result_data.columns) == 1:
+                    value = result_data.iloc[0, 0]
+                    col_name = result_data.columns[0].replace('_', ' ').title()
+                    if isinstance(value, (int, float)):
+                        if any(keyword in col_name.lower() for keyword in ['price', 'amount', 'value', 'total', 'cost', 'revenue', 'sales', 'payment']):
+                            answer = f"The {col_name} is ${value:,.2f}"
+                        else:
+                            answer = f"The {col_name} is {value:,}"
+                    else:
+                        answer = f"The {col_name} is {value}"
+                elif len(result_data) <= 10:
+                    answer = f"Query returned {len(result_data)} result(s)."
+                else:
+                    answer = f"Found {len(result_data)} result(s)."
+
+                # Create result dict matching LLM format
+                result = {
+                    'answer': answer,
+                    'sql_query': sql_query
+                }
+            except Exception as e:
+                logger.error(f"Template SQL failed: {e}")
+                result = {
+                    'answer': f"Error executing query: {str(e)}",
+                    'sql_query': None
+                }
+        else:
+            # Fallback to LLM for non-template questions
+            logger.info("No template found, calling LLM API...")
+            result = components['sql_agent'].query(question)
 
         response = {
             'question': question,
