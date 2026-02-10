@@ -93,16 +93,29 @@ class CacheWarmer:
                     try:
                         result_data = self.db_handler.execute_query(sql_query)
 
-                        # Generate simple answer from data
-                        if len(result_data) == 1 and len(result_data.columns) == 1:
+                        # Generate answer from data (matching process_user_query logic)
+                        if result_data.empty:
+                            answer = "No data found for the specified criteria."
+                        elif len(result_data) == 1 and len(result_data.columns) == 1:
+                            # Single value result (aggregations like COUNT, SUM, AVG)
                             value = result_data.iloc[0, 0]
                             col_name = result_data.columns[0].replace('_', ' ').title()
+
+                            # Format based on column name and value type
                             if isinstance(value, (int, float)):
-                                answer = f"The {col_name} is {value:,}"
+                                # Check if it's a currency value
+                                if any(keyword in col_name.lower() for keyword in ['price', 'amount', 'value', 'total', 'cost', 'revenue', 'sales', 'payment']):
+                                    answer = f"The {col_name} is ${value:,.2f}"
+                                else:
+                                    answer = f"The {col_name} is {value:,}"
                             else:
                                 answer = f"The {col_name} is {value}"
+                        elif len(result_data) <= 10:
+                            # Small result set - provide summary that mentions data table
+                            answer = f"Query returned {len(result_data)} result(s)."
                         else:
-                            answer = f"Query returned {len(result_data)} row(s)."
+                            # Large result set
+                            answer = f"Found {len(result_data)} result(s)."
 
                     except Exception as e:
                         logger.error(f"Template SQL failed: {e}")
