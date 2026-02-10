@@ -6,6 +6,19 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
+# Helper function to get config values from Streamlit secrets or environment variables
+def get_config(key: str, default: str = None) -> str:
+    """Get configuration value from Streamlit secrets or environment variables."""
+    try:
+        import streamlit as st
+        # Try Streamlit secrets first (for production)
+        if hasattr(st, 'secrets') and key in st.secrets:
+            return st.secrets[key]
+    except (ImportError, FileNotFoundError, KeyError):
+        pass
+    # Fallback to environment variables (for local development)
+    return os.getenv(key, default)
+
 # Base paths
 BASE_DIR = Path(__file__).parent
 DATA_DIR = BASE_DIR / "data"
@@ -23,14 +36,14 @@ DB_URL = f"sqlite:///{DB_PATH}"
 
 # Cache configuration
 CACHE_DB_PATH = DB_DIR / "query_cache.db"
-CACHE_DEFAULT_TTL = int(os.getenv("CACHE_TTL_SECONDS", "86400"))  # 24 hours
-CACHE_MAX_SIZE_MB = int(os.getenv("CACHE_MAX_SIZE_MB", "500"))
-CACHE_MAX_RESULT_SIZE_MB = int(os.getenv("CACHE_MAX_RESULT_SIZE_MB", "10"))
-CACHE_ENABLED = os.getenv("CACHE_ENABLED", "true").lower() == "true"
+CACHE_DEFAULT_TTL = int(get_config("CACHE_TTL_SECONDS", "86400"))  # 24 hours
+CACHE_MAX_SIZE_MB = int(get_config("CACHE_MAX_SIZE_MB", "500"))
+CACHE_MAX_RESULT_SIZE_MB = int(get_config("CACHE_MAX_RESULT_SIZE_MB", "10"))
+CACHE_ENABLED = get_config("CACHE_ENABLED", "true").lower() == "true"
 
 # OpenRouter configuration
-OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
-OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "openai/gpt-4-turbo")
+OPENROUTER_API_KEY = get_config("OPENROUTER_API_KEY")
+OPENROUTER_MODEL = get_config("OPENROUTER_MODEL", "openai/gpt-4-turbo")
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 
 # Available OpenRouter models
@@ -47,10 +60,10 @@ AVAILABLE_MODELS = {
 }
 
 # LangSmith configuration
-LANGCHAIN_TRACING_V2 = os.getenv("LANGCHAIN_TRACING_V2", "true")
-LANGCHAIN_ENDPOINT = os.getenv("LANGCHAIN_ENDPOINT", "https://api.smith.langchain.com")
-LANGCHAIN_API_KEY = os.getenv("LANGCHAIN_API_KEY")
-LANGCHAIN_PROJECT = os.getenv("LANGCHAIN_PROJECT", "nlp-to-sql-app")
+LANGCHAIN_TRACING_V2 = get_config("LANGCHAIN_TRACING_V2", "true")
+LANGCHAIN_ENDPOINT = get_config("LANGCHAIN_ENDPOINT", "https://api.smith.langchain.com")
+LANGCHAIN_API_KEY = get_config("LANGCHAIN_API_KEY")
+LANGCHAIN_PROJECT = get_config("LANGCHAIN_PROJECT", "nlp-to-sql-app")
 
 # Streamlit configuration
 PAGE_TITLE = "EMB Global - NL to SQL Intelligence"
@@ -71,4 +84,4 @@ LLM_TEMPERATURE = 0.0
 LLM_MAX_TOKENS = 2000
 
 # Report configuration
-COMPANY_NAME = os.getenv("COMPANY_NAME", "EMB Global")
+COMPANY_NAME = get_config("COMPANY_NAME", "EMB Global")
