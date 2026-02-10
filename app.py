@@ -15,6 +15,7 @@ from report_generator import ReportGenerator
 from advanced_report_generator import AdvancedReportGenerator
 from sample_questions import get_all_sample_questions, get_categories
 from cache_manager import CacheManager
+from cache_warmer import warm_cache_on_startup
 
 # Configure logging
 logging.basicConfig(
@@ -1016,6 +1017,23 @@ def main():
     # Initialize
     initialize_session_state()
     components = initialize_system()
+
+    # Warm cache with suggested questions (only on first run)
+    if CACHE_ENABLED and components.get('cache_manager'):
+        if 'cache_warmed' not in st.session_state:
+            with st.spinner('Preparing suggested questions...'):
+                try:
+                    current_model = st.session_state.get('selected_model', OPENROUTER_MODEL)
+                    stats = warm_cache_on_startup(components, current_model)
+                    if stats.get('success'):
+                        logger.info(f"Cache warming successful: {stats.get('cached_count')} questions cached")
+                        st.session_state.cache_warmed = True
+                    else:
+                        logger.warning(f"Cache warming failed: {stats.get('reason', 'Unknown')}")
+                        st.session_state.cache_warmed = False
+                except Exception as e:
+                    logger.error(f"Cache warming error: {e}")
+                    st.session_state.cache_warmed = False
 
     # Header
     st.markdown('<div class="app-subtitle">NL to SQL Intelligence Platform</div>', unsafe_allow_html=True)
