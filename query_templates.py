@@ -4,28 +4,28 @@ SUGGESTED_QUESTION_TEMPLATES = {
     # Basic Queries (5 questions)
     "Show me all customers": "SELECT * FROM customers LIMIT 100",
 
-    "How many orders do we have?": "SELECT COUNT(*) AS total_orders FROM orders",
+    "How many orders do we have": "SELECT COUNT(*) AS total_orders FROM orders",
 
-    "What are the top 5 products by price?": "SELECT * FROM products ORDER BY buyPrice DESC LIMIT 5",
+    "What are the top 5 products by price": "SELECT * FROM products ORDER BY buyPrice DESC LIMIT 5",
 
     "List all employees": "SELECT * FROM employees",
 
     "Show me the office locations": "SELECT city, country, addressLine1 FROM offices",
 
     # Aggregation Queries (5 questions)
-    "What is the total revenue from all orders?": """
+    "What is the total revenue from all orders": """
         SELECT SUM(quantityOrdered * priceEach) AS total_revenue
         FROM orderdetails
     """,
 
-    "How many customers are in each country?": """
+    "How many customers are in each country": """
         SELECT country, COUNT(*) AS customer_count
         FROM customers
         GROUP BY country
         ORDER BY customer_count DESC
     """,
 
-    "What is the average order value?": """
+    "What is the average order value": """
         SELECT AVG(order_total) AS avg_order_value
         FROM (
             SELECT orderNumber, SUM(quantityOrdered * priceEach) AS order_total
@@ -41,13 +41,13 @@ SUGGESTED_QUESTION_TEMPLATES = {
         ORDER BY product_count DESC
     """,
 
-    "What is the total payment received?": """
+    "What is the total payment received": """
         SELECT SUM(amount) AS total_payments
         FROM payments
     """,
 
     # Analysis Queries (5 questions)
-    "Which customers have spent the most?": """
+    "Which customers have spent the most": """
         SELECT c.customerName, SUM(od.quantityOrdered * od.priceEach) AS total_spent
         FROM customers c
         JOIN orders o ON c.customerNumber = o.customerNumber
@@ -57,7 +57,7 @@ SUGGESTED_QUESTION_TEMPLATES = {
         LIMIT 10
     """,
 
-    "What are the top selling products?": """
+    "What are the top selling products": """
         SELECT p.productName, SUM(od.quantityOrdered) AS total_sold
         FROM products p
         JOIN orderdetails od ON p.productCode = od.productCode
@@ -77,7 +77,7 @@ SUGGESTED_QUESTION_TEMPLATES = {
         LIMIT 12
     """,
 
-    "Which sales representatives have the most customers?": """
+    "Which sales representatives have the most customers": """
         SELECT e.firstName || ' ' || e.lastName AS sales_rep, COUNT(*) AS customer_count
         FROM employees e
         JOIN customers c ON e.employeeNumber = c.salesRepEmployeeNumber
@@ -85,7 +85,7 @@ SUGGESTED_QUESTION_TEMPLATES = {
         ORDER BY customer_count DESC
     """,
 
-    "What is the distribution of orders by status?": """
+    "What is the distribution of orders by status": """
         SELECT status, COUNT(*) AS order_count
         FROM orders
         GROUP BY status
@@ -149,7 +149,7 @@ SUGGESTED_QUESTION_TEMPLATES = {
     """,
 
     # Complex Queries (5 questions)
-    "Which products have never been ordered?": """
+    "Which products have never been ordered": """
         SELECT p.productCode, p.productName
         FROM products p
         LEFT JOIN orderdetails od ON p.productCode = od.productCode
@@ -165,7 +165,7 @@ SUGGESTED_QUESTION_TEMPLATES = {
         ORDER BY order_count DESC
     """,
 
-    "What is the revenue trend for the last 6 months?": """
+    "What is the revenue trend for the last 6 months": """
         SELECT
             strftime('%Y-%m', o.orderDate) AS month,
             SUM(od.quantityOrdered * od.priceEach) AS revenue
@@ -186,7 +186,7 @@ SUGGESTED_QUESTION_TEMPLATES = {
         ORDER BY profit DESC
     """,
 
-    "Which employees manage the most valuable customers?": """
+    "Which employees manage the most valuable customers": """
         SELECT
             e.firstName || ' ' || e.lastName AS employee_name,
             SUM(od.quantityOrdered * od.priceEach) AS managed_customer_value
