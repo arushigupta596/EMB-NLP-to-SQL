@@ -1078,6 +1078,26 @@ def main():
         if 'cache_warmed' not in st.session_state:
             with st.spinner('Preparing suggested questions...'):
                 try:
+                    # Clear any cached errors (404, 402, etc.) before warming
+                    cache_manager = components.get('cache_manager')
+                    if cache_manager:
+                        logger.info("Checking for cached errors to clear...")
+                        try:
+                            # Clear cache entries that contain error responses
+                            conn = cache_manager._get_connection()
+                            cursor = conn.cursor()
+                            cursor.execute("""
+                                DELETE FROM query_cache
+                                WHERE answer LIKE '%Error code:%'
+                                   OR answer LIKE 'Error%'
+                            """)
+                            deleted_count = cursor.rowcount
+                            conn.commit()
+                            if deleted_count > 0:
+                                logger.info(f"Cleared {deleted_count} cached error(s)")
+                        except Exception as e:
+                            logger.warning(f"Failed to clear cached errors: {e}")
+
                     # ALWAYS use free Llama model for cache warming
                     current_model = "meta-llama/llama-3.1-8b-instruct:free"
                     stats = warm_cache_on_startup(components, current_model)
