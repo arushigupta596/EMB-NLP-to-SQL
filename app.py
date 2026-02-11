@@ -697,7 +697,7 @@ def process_user_query(question: str, components):
     """Process user query and return response."""
     try:
         # ALWAYS use free Llama model in backend (regardless of UI selection)
-        current_model = "meta-llama/llama-3.1-8b-instruct:free"
+        current_model = "meta-llama/llama-3.2-3b-instruct:free"
 
         # CHECK CACHE FIRST (if cache manager is available)
         cache_manager = components.get('cache_manager')
@@ -1139,7 +1139,7 @@ def main():
             with st.spinner('Preparing suggested questions...'):
                 try:
                     # ALWAYS use free Llama model for cache warming
-                    current_model = "meta-llama/llama-3.1-8b-instruct:free"
+                    current_model = "meta-llama/llama-3.2-3b-instruct:free"
                     stats = warm_cache_on_startup(components, current_model)
                     if stats.get('success'):
                         logger.info(f"Cache warming successful: {stats.get('cached_count')} questions cached")
